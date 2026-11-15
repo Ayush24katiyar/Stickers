@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sticker — GIF, image or video to WhatsApp sticker</title>
+  <meta name="description" content="Convert a GIF, image or short video into a WhatsApp-ready sticker. 512x512 WebP, under the size limit, done locally." />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2325d366'/%3E%3Cpath d='M9 10h14v9a4 4 0 0 1-4 4h-6l-4 3v-3.5A3 3 0 0 1 9 20z' fill='%230b1410'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div class="bg-glow" aria-hidden="true"></div>
+
+  <main class="shell">
+    <header class="top">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="22" height="22"><path d="M6 5h20v13a6 6 0 0 1-6 6h-7l-7 5v-5.5A6 6 0 0 1 6 18z" fill="currentColor"/></svg>
+        </span>
+        <span class="brand-name">sticker</span>
+      </a>
+      <span class="pill">512 × 512 · WebP · ≤ 500 KB</span>
+    </header>
+
+    <section class="hero">
+      <h1>Anything becomes a<br /><span class="grad">WhatsApp sticker</span></h1>
+      <p class="sub">Paste a link from X, Tenor, Giphy or anywhere — GIFs, images and full videos all work. Videos are squeezed into a 512 × 512 transparent sticker that fits WhatsApp's limits (≤ 10 s, ≤ 500 KB); pick any 10 seconds of the clip.</p>
+    </section>
+
+    <section class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab is-active" id="tab-link" role="tab" aria-selected="true" aria-controls="panel-link">Paste link</button>
+        <button class="tab" id="tab-upload" role="tab" aria-selected="false" aria-controls="panel-upload">Upload file</button>
+      </div>
+
+      <div class="panel" id="panel-link" role="tabpanel" aria-labelledby="tab-link">
+        <label class="field">
+          <span class="sr-only">Media URL</span>
+          <input id="url-input" type="url" inputmode="url" spellcheck="false"
+                 placeholder="https://x.com/... or any direct gif, png, jpg, webp or mp4 link" autocomplete="off" />
+        </label>
+        <button class="btn primary" id="convert-url">Convert link</button>
+      </div>
+
+      <div class="panel is-hidden" id="panel-upload" role="tabpanel" aria-labelledby="tab-upload">
+        <label class="drop" id="drop" tabindex="0">
+          <input id="file-input" type="file" accept="image/gif,image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime,.gif,.png,.jpg,.jpeg,.webp,.mp4,.webm,.mov" hidden />
+          <span class="drop-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+            </svg>
+          </span>
+          <span class="drop-title">Drop a GIF, image, or video</span>
+          <span class="drop-hint">or click to browse · GIF/image 20 MB · video up to 250 MB (pick any 10 s)</span>
+          <span class="drop-file is-hidden" id="file-name"></span>
+        </label>
+        <button class="btn primary" id="convert-file" disabled>Convert file</button>
+      </div>
+
+      <details class="limits">
+        <summary>Fine print — what sticker can and can&rsquo;t do</summary>
+        <ul>
+          <li><b>WhatsApp decides the specs:</b> 512 × 512 px · still ≤ 100 KB · animated ≤ 500 KB · max 10 seconds · frames ≥ 8 ms (we use 10 ms).</li>
+          <li><b>Anything longer is cut</b> to the 10-second window you pick — GIFs and videos alike. Un-trimmed GIFs keep the first 10 s.</li>
+          <li><b>Video stickers are silent.</b> WhatsApp allows no audio in stickers, and this tool drops it.</li>
+          <li><b>Still images become single-frame stickers.</b> Very busy 10-second clips get re-compressed harder — lower quality, then fewer frames — to reach 500 KB.</li>
+          <li><b>Uploads:</b> GIF, PNG, JPEG, WebP ≤ 20 MB · videos up to 250 MB. <b>Links:</b> https only · ≤ 20 MB (≤ 40 MB for video links) · private / localhost links are refused.</li>
+          <li><b>X / Twitter:</b> public posts only, first media only, and its MP4 usually needs a moment to load.</li>
+          <li><b>Importing:</b> WhatsApp has no API to add a sticker directly — open the .webp in a sticker-maker app (Sticker Maker, Sticker.ly, …) to use it.</li>
+        </ul>
+      </details>
+
+      <section class="trim is-hidden" id="trim" aria-label="Choose the part of the video to keep">
+        <div class="trim-stage">
+          <video id="trim-video" muted playsinline controls preload="metadata"></video>
+        </div>
+        <div class="trim-controls">
+          <span class="trim-hint">Drag to choose where the 10-second sticker starts · WhatsApp limit: 10 s</span>
+          <span class="trim-caption" id="trim-caption" role="status"></span>
+          <div class="trim-range-row" id="trim-range-row">
+            <input id="trim-start" type="range" min="0" max="0" step="0.1" value="0" aria-label="Start of the 10 second clip" />
+          </div>
+        </div>
+      </section>
+
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="result is-hidden" id="result">
+      <div class="result-grid">
+        <figure class="preview">
+          <div class="stage checker">
+            <img id="before-img" alt="Original GIF preview" />
+          </div>
+          <figcaption>Original</figcaption>
+        </figure>
+        <figure class="preview">
+          <div class="stage checker">
+            <img id="after-img" alt="Converted sticker preview" />
+          </div>
+          <figcaption>Sticker</figcaption>
+        </figure>
+      </div>
+
+      <div class="meta" id="meta"></div>
+
+      <div class="actions">
+        <a class="btn primary" id="download" download="sticker.webp">Download .webp</a>
+        <button class="btn ghost" id="reset">Convert another</button>
+      </div>
+      <p class="note">Open WhatsApp → Stickers → any sticker maker app to import this file into a pack.</p>
+    </section>
+
+    <footer class="foot">
+      <span>Runs on a local Rust server — uploads never leave your machine. Pasted links are fetched by the server, and video frames are sampled in your browser.</span>
+      <span class="dot">·</span>
+      <span>Sticker spec: 512 × 512 px WebP, ≤ 100 KB static / ≤ 500 KB animated, ≤ 10 s, min frame 8 ms.</span>
+    </footer>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
