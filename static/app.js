@@ -43,39 +43,6 @@ let pendingVideo = null;
 /// Which part of the source video ended up in the sticker, for the result chip.
 let sourceRange = null;
 
-/* ---------------- logo version switcher ---------------- */
-
-const LOGO_STORAGE_KEY = "sticker-logo-version";
-const LOGO_VERSIONS = ["v1", "v2", "v3", "v4"];
-const logoButtons = document.querySelectorAll(".logo-btn");
-
-function setLogoVersion(version) {
-  const value = LOGO_VERSIONS.includes(version) ? version : "v1";
-  document.body.dataset.logo = value;
-  logoButtons.forEach((btn) =>
-    btn.classList.toggle("is-active", btn.dataset.logoV === value),
-  );
-  try {
-    localStorage.setItem(LOGO_STORAGE_KEY, value);
-  } catch {
-    /* storage may be unavailable; the choice still applies for this load */
-  }
-}
-
-logoButtons.forEach((btn) => {
-  btn.addEventListener("click", () => setLogoVersion(btn.dataset.logoV));
-});
-
-(function initLogoVersion() {
-  let saved = "v1";
-  try {
-    saved = localStorage.getItem(LOGO_STORAGE_KEY) || "v1";
-  } catch {
-    /* ignore */
-  }
-  setLogoVersion(saved);
-})();
-
 /* ---------------- tabs ---------------- */
 
 function setTab(name) {
@@ -93,13 +60,10 @@ els.tabUpload.addEventListener("click", () => setTab("upload"));
 
 /* ---------------- helpers ---------------- */
 
-// Small green chat-bubble from the v1 brand mark, used as the busy indicator.
-const BRAND_SPIN = '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 5h20v13a6 6 0 0 1-6 6h-7l-7 5v-5.5A6 6 0 0 1 6 18z" fill="#25d366"/></svg>';
-
 function setStatus(message, kind = "") {
   els.status.className = "status" + (kind ? " " + kind : "");
   els.status.innerHTML =
-    kind === "busy" ? `<span class="spin">${BRAND_SPIN}</span>${escapeHtml(message)}` : escapeHtml(message || "");
+    kind === "busy" ? `<span class="spin"></span>${escapeHtml(message)}` : escapeHtml(message || "");
 }
 
 function escapeHtml(value) {
@@ -744,82 +708,6 @@ function filenameFor(base) {
   const name = source.split(/[\\/]/).pop()?.replace(/\.[a-z0-9]{2,5}$/i, "").replace(/[^\w.-]+/g, "-") || base;
   return `${name}.webp`;
 }
-
-/* ---------------- try-one samples ---------------- */
-
-/** Draw a 512px transparent shape that the normal converter can decode as a PNG. */
-function drawSample(ctx, kind) {
-  const c = ctx.canvas;
-  ctx.clearRect(0, 0, c.width, c.height);
-  ctx.save();
-  ctx.translate(256, 256);
-
-  if (kind === "star") {
-    ctx.fillStyle = "#ffd166";
-    ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const r = i % 2 === 0 ? 196 : 84;
-      const a = -Math.PI / 2 + i * Math.PI / 5;
-      const x = Math.cos(a) * r;
-      const y = Math.sin(a) * r;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fill();
-  } else if (kind === "heart") {
-    ctx.fillStyle = "#ff8fa3";
-    ctx.beginPath();
-    ctx.moveTo(0, 176);
-    ctx.bezierCurveTo(-272, 26, -156, -186, 0, -74);
-    ctx.bezierCurveTo(156, -186, 272, 26, 0, 176);
-    ctx.fill();
-  } else {
-    ctx.fillStyle = "#8be0ff";
-    ctx.beginPath();
-    ctx.arc(0, 0, 188, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#06130c";
-    ctx.beginPath(); ctx.arc(-70, -52, 21, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(70, -52, 21, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "#06130c";
-    ctx.lineWidth = 19;
-    ctx.lineCap = "round";
-    ctx.beginPath(); ctx.arc(0, 18, 98, 0.25 * Math.PI, 0.75 * Math.PI); ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
-function makeSampleFile(kind) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 512;
-  drawSample(canvas.getContext("2d"), kind);
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => (blob
-        ? resolve(new File([blob], `sample-${kind}.png`, { type: "image/png" }))
-        : reject(new Error("Could not build the sample image."))),
-      "image/png",
-    );
-  });
-}
-
-async function useSample(kind) {
-  if (busy) return;
-  try {
-    const file = await makeSampleFile(kind);
-    setTab("upload");
-    await pickFile(file);
-    if (selectedFile) await convertFromFile();
-  } catch (error) {
-    setStatus(friendlyError(error), "error");
-  }
-}
-
-document.querySelectorAll(".sample").forEach((btn) => {
-  btn.addEventListener("click", () => useSample(btn.dataset.sample));
-});
 
 /* ---------------- reset ---------------- */
 

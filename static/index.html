@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/style.css" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2325d366'/%3E%3Cpath d='M9 10h14v9a4 4 0 0 1-4 4h-6l-4 3v-3.5A3 3 0 0 1 9 20z' fill='%230b1410'/%3E%3C/svg%3E" />
 </head>
-<body data-logo="v1">
+<body>
   <div class="bg-glow" aria-hidden="true"></div>
   <div class="dots" aria-hidden="true"></div>
 
@@ -27,19 +27,21 @@
   <svg class="float float-12" viewBox="0 0 64 64" width="48" height="48" aria-hidden="true"><path d="M13 22c0-2 2-4 4-4h30c2 0 4 2 4 4v22c0 2-2 4-4 4H17c-2 0-4-2-4-4z" fill="#cdb4f5" stroke="#10221a" stroke-width="2.4" stroke-linejoin="round"/><circle cx="26" cy="33" r="3.4" fill="#fdf5ec" stroke="#10221a" stroke-width="1.8"/><circle cx="38" cy="33" r="3.4" fill="#fdf5ec" stroke="#10221a" stroke-width="1.8"/><circle cx="26" cy="33.4" r="1.5" fill="#10221a"/><circle cx="38" cy="33.4" r="1.5" fill="#10221a"/><path d="M28.5 41q3.5 2.6 7 0" stroke="#10221a" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
 
   <main class="shell">
-    <!-- v4: original standalone header row (only visible in the topleft treatment) -->
-    <header class="logo-topleft">
-      <a class="brand" href="/" aria-label="sticker home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" width="22" height="22"><path d="M6 5h20v13a6 6 0 0 1-6 6h-7l-7 5v-5.5A6 6 0 0 1 6 18z" fill="currentColor"/></svg></span><span>sticker</span></a>
+    <header class="top">
+      <a class="brand" href="/" aria-label="sticker home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="22" height="22"><path d="M6 5h20v13a6 6 0 0 1-6 6h-7l-7 5v-5.5A6 6 0 0 1 6 18z" fill="currentColor"/></svg>
+        </span>
+        <span class="wordmark">sticker</span>
+      </a>
     </header>
 
     <section class="hero">
-      <h1><a class="brand-inline logo-inline" href="/" aria-label="sticker home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" width="22" height="22"><path d="M6 5h20v13a6 6 0 0 1-6 6h-7l-7 5v-5.5A6 6 0 0 1 6 18z" fill="currentColor"/></svg></span></a>Anything becomes a<br /><span class="grad">WhatsApp sticker</span></h1>
-      <p class="sub">Paste an X, Tenor, Giphy or any link — GIFs, images and videos work. 512 × 512 transparent sticker (≤ 10&nbsp;s, ≤ 500&nbsp;KB); pick any 10&nbsp;s.</p>
+      <h1>Anything becomes a<br /><span class="grad">WhatsApp sticker</span></h1>
+      <p class="sub">Paste a link from X, Tenor, Giphy or anywhere — GIFs, images and full videos all work. Videos are squeezed into a 512 × 512 transparent sticker that fits WhatsApp's limits (≤ 10 s, ≤ 500 KB); pick any 10 seconds of the clip.</p>
     </section>
 
     <section class="card">
-      <!-- v3: small logo badge overlapping the card's top-left corner -->
-      <span class="logo-badge" aria-hidden="true"><span class="brand-mark"><svg viewBox="0 0 32 32" width="22" height="22"><path d="M6 5h20v13a6 6 0 0 1-6 6h-7l-7 5v-5.5A6 6 0 0 1 6 18z" fill="currentColor"/></svg></span></span>
       <div class="tabs" role="tablist">
         <button class="tab is-active" id="tab-link" role="tab" aria-selected="true" aria-controls="panel-link">Link</button>
         <button class="tab" id="tab-upload" role="tab" aria-selected="false" aria-controls="panel-upload">Drop</button>
@@ -91,26 +93,6 @@
       <p class="status" id="status" role="status" aria-live="polite"></p>
     </section>
 
-    <div class="spec-strip">
-      <div class="spec-line">GIF · PNG · WEBP · MP4 · MOV · WEBM</div>
-      <div class="spec-line spec-line--dim">local · 512×512 · ≤500 KB · ≤10 s</div>
-      <div class="samples">
-        <span class="samples-label">Try one:</span>
-        <button type="button" class="sample" data-sample="star" aria-label="Try the star sample">
-          <span class="sample-thumb" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.7 1.2 6.6L12 17.6l-5.9 3.2 1.2-6.6-4.8-4.7 6.6-.9z" fill="#ffd166"/></svg></span>
-          <span class="sample-size">star · 512px</span>
-        </button>
-        <button type="button" class="sample" data-sample="heart" aria-label="Try the heart sample">
-          <span class="sample-thumb" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20.5S4.5 15.8 4.5 10.4A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.4c0 5.4-7.5 10.1-7.5 10.1z" fill="#ff8fa3"/></svg></span>
-          <span class="sample-size">heart · 512px</span>
-        </button>
-        <button type="button" class="sample" data-sample="smile" aria-label="Try the smiley sample">
-          <span class="sample-thumb" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#8be0ff"/><circle cx="9" cy="10" r="1.3" fill="#06130c"/><circle cx="15" cy="10" r="1.3" fill="#06130c"/><path d="M8.4 14.2q3.6 3 7.2 0" stroke="#06130c" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg></span>
-          <span class="sample-size">smile · 512px</span>
-        </button>
-      </div>
-    </div>
-
     <section class="result is-hidden" id="result">
       <div class="result-grid">
         <figure class="preview">
@@ -136,16 +118,8 @@
       <p class="note">Open WhatsApp → Stickers → any sticker maker app to import this file into a pack.</p>
     </section>
 
-    <footer class="foot"><span class="logo-footer" aria-hidden="true"><span class="brand-mark"><svg viewBox="0 0 32 32" width="22" height="22"><path d="M6 5h20v13a6 6 0 0 1-6 6h-7l-7 5v-5.5A6 6 0 0 1 6 18z" fill="currentColor"/></svg></span></span><span>local · 512 × 512 · ≤ 10 s · ≤ 500 KB</span></footer>
+    <footer class="foot">local · 512 × 512 · ≤ 10 s · ≤ 500 KB</footer>
   </main>
-
-  <!-- tiny corner control for previewing the four logo treatments -->
-  <nav class="logo-switcher" aria-label="Logo version">
-    <button type="button" class="logo-btn is-active" data-logo-v="v1" aria-label="Logo version 1">v1</button>
-    <button type="button" class="logo-btn" data-logo-v="v2" aria-label="Logo version 2">v2</button>
-    <button type="button" class="logo-btn" data-logo-v="v3" aria-label="Logo version 3">v3</button>
-    <button type="button" class="logo-btn" data-logo-v="v4" aria-label="Logo version 4">v4</button>
-  </nav>
 
   <script src="/app.js"></script>
 </body>
