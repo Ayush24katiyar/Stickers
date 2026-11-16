@@ -43,6 +43,39 @@ let pendingVideo = null;
 /// Which part of the source video ended up in the sticker, for the result chip.
 let sourceRange = null;
 
+/* ---------------- logo version switcher ---------------- */
+
+const LOGO_STORAGE_KEY = "sticker-logo-version";
+const LOGO_VERSIONS = ["v1", "v2", "v3", "v4"];
+const logoButtons = document.querySelectorAll(".logo-btn");
+
+function setLogoVersion(version) {
+  const value = LOGO_VERSIONS.includes(version) ? version : "v1";
+  document.body.dataset.logo = value;
+  logoButtons.forEach((btn) =>
+    btn.classList.toggle("is-active", btn.dataset.logoV === value),
+  );
+  try {
+    localStorage.setItem(LOGO_STORAGE_KEY, value);
+  } catch {
+    /* storage may be unavailable; the choice still applies for this load */
+  }
+}
+
+logoButtons.forEach((btn) => {
+  btn.addEventListener("click", () => setLogoVersion(btn.dataset.logoV));
+});
+
+(function initLogoVersion() {
+  let saved = "v1";
+  try {
+    saved = localStorage.getItem(LOGO_STORAGE_KEY) || "v1";
+  } catch {
+    /* ignore */
+  }
+  setLogoVersion(saved);
+})();
+
 /* ---------------- tabs ---------------- */
 
 function setTab(name) {

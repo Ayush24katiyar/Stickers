@@ -145,6 +145,7 @@ h1 {
 /* ---------- card ---------- */
 
 .card {
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -589,4 +590,108 @@ figcaption {
   .result-grid { grid-template-columns: 1fr; }
   .actions .btn { flex: 1; }
   .foot { font-size: 11.5px; }
+}
+
+/* ---------- switchable logo treatments ---------- */
+
+/* All four treatments live in this one build; only the active one shows.
+   The default <body data-logo="v1"> covers first paint, JS restores the
+   saved choice from localStorage. */
+.logo-inline,
+.logo-footer,
+.logo-badge,
+.logo-topleft { display: none; }
+
+body[data-logo="v1"] .logo-inline  { display: inline-flex; }
+body[data-logo="v2"] .logo-footer  { display: inline-flex; }
+body[data-logo="v3"] .logo-badge   { display: flex; }
+body[data-logo="v4"] .logo-topleft { display: flex; }
+
+/* v4 is the only treatment with a standalone header, so it restores the
+   shorter top padding of the original layout. */
+body[data-logo="v4"] .shell { padding-top: 55px; }
+
+/* v4 header row: sits at the top-left of the 822px column */
+.logo-topleft {
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  margin-bottom: 30px;
+}
+
+/* the small green mark shared by the footer and badge treatments */
+.logo-footer,
+.logo-badge { align-items: center; }
+
+.logo-footer .brand-mark,
+.logo-badge .brand-mark {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.logo-footer .brand-mark svg,
+.logo-badge .brand-mark svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* v3: badge hangs just off the card's top-left corner */
+.logo-badge {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  z-index: 2;
+}
+.logo-badge .brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  box-shadow: 0 6px 14px -6px rgba(0, 0, 0, 0.8);
+}
+.logo-badge .brand-mark svg {
+  width: 19px;
+  height: 19px;
+}
+
+@media (max-width: 640px) {
+  body[data-logo="v4"] .shell { padding-top: 20px; }
+}
+
+/* ---------- corner logo switcher ---------- */
+
+.logo-switcher {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  z-index: 9999;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+.logo-switcher:hover { opacity: 1; }
+
+.logo-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #8a9a91;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.logo-btn:hover { color: var(--text); }
+.logo-btn.is-active {
+  color: #06130c;
+  background: var(--green);
 }
