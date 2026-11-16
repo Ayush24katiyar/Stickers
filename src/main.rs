@@ -51,16 +51,36 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+const NO_STORE: &str = "no-store, must-revalidate";
+
 async fn index() -> impl IntoResponse {
-    ([(header::CONTENT_TYPE, "text/html; charset=utf-8")], INDEX)
+    (
+        [
+            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (header::CACHE_CONTROL, NO_STORE),
+        ],
+        INDEX,
+    )
 }
 
 async fn style() -> impl IntoResponse {
-    ([(header::CONTENT_TYPE, "text/css; charset=utf-8")], STYLE)
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, NO_STORE),
+        ],
+        STYLE,
+    )
 }
 
 async fn script() -> impl IntoResponse {
-    ([(header::CONTENT_TYPE, "text/javascript; charset=utf-8")], SCRIPT)
+    (
+        [
+            (header::CONTENT_TYPE, "text/javascript; charset=utf-8"),
+            (header::CACHE_CONTROL, NO_STORE),
+        ],
+        SCRIPT,
+    )
 }
 
 #[derive(Deserialize)]
