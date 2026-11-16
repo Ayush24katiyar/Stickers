@@ -117,7 +117,7 @@ body {
 
 .brand-inline:hover .brand-mark { filter: brightness(1.08); }
 
-.hero { text-align: center; margin-bottom: 46px; margin-top: 0; width: 100%; }
+.hero { text-align: center; margin-bottom: 68.5px; margin-top: 0; width: 100%; }
 
 h1 {
   margin: 0 0 14px;
@@ -345,19 +345,27 @@ input[type="url"]:focus {
 .status.error { color: #ff8b8b; }
 .status.busy { color: #8fd9b0; }
 
+/* busy state: the brand bubble, gently pulsing */
 .status .spin {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
   margin-right: 7px;
-  vertical-align: -1px;
-  border: 2px solid rgba(37, 211, 102, 0.25);
-  border-top-color: var(--green);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  vertical-align: -2px;
 }
-
-@keyframes spin { to { transform: rotate(360deg); } }
+.status .spin svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+  transform-origin: 50% 62%;
+  filter: drop-shadow(0 0 5px rgba(37, 211, 102, 0.6));
+  animation: bubblePulse 1s ease-in-out infinite;
+}
+@keyframes bubblePulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.7; }
+  50%      { transform: scale(1.12); opacity: 1; }
+}
 
 /* ---------- video trim ---------- */
 
@@ -460,6 +468,79 @@ input[type="url"]:focus {
 
 @media (max-width: 900px) {
   .float { display: none; }
+}
+
+/* ---------- quiet spec line + try-one samples (under the card) ---------- */
+
+.spec-strip { margin-top: 14px; text-align: center; }
+
+.spec-line {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  line-height: 1.65;
+  color: #6b7b72;
+}
+.spec-line--dim { color: #56665e; }
+
+.samples {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.samples-label { font-size: 11px; color: #56665e; }
+
+.sample {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+  padding: 5px 9px 4px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+.sample:hover { border-color: rgba(37, 211, 102, 0.5); background: var(--green-soft); }
+.sample:active { transform: translateY(1px); }
+.sample:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.sample:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.sample-thumb svg {
+  display: block;
+  width: 28px;
+  height: 28px;
+  animation: sampleBob 2.4s ease-in-out infinite;
+}
+.sample[data-sample="heart"] .sample-thumb svg { animation-name: samplePulse; }
+.sample[data-sample="smile"] .sample-thumb svg { animation-name: sampleTilt; }
+
+@keyframes sampleBob {
+  0%, 100% { transform: translateY(-2px); }
+  50%      { transform: translateY(2px); }
+}
+@keyframes samplePulse {
+  0%, 100% { transform: scale(0.9); }
+  50%      { transform: scale(1.1); }
+}
+@keyframes sampleTilt {
+  0%, 100% { transform: rotate(-9deg); }
+  50%      { transform: rotate(9deg); }
+}
+
+.sample-size {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: #6b7b72;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status .spin svg,
+  .sample-thumb svg { animation: none; }
 }
 
 /* ---------- result ---------- */
