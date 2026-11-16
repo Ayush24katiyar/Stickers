@@ -23,7 +23,7 @@ Set a different port with `PORT=8080 cargo run --release`.
 ## How to use
 
 - **Paste link** — works with direct `https://...gif` / image / video links, and with X/Twitter post links. X stores "GIFs" as MP4, so those are resolved to the underlying media automatically.
-- **Upload file** — pick or drag a GIF, PNG, JPEG, WebP, MP4, WebM or MOV (20 MB image cap; local videos up to 250 MB), or press `Ctrl/Cmd+V` after copying something. For videos longer than 10 seconds a preview appears with a start slider — drag to keep the part you want.
+- **Upload file** — pick or drag a GIF, animated or still WebP, PNG, JPEG, MP4, WebM or MOV (20 MB image cap; local videos up to 250 MB), or press `Ctrl/Cmd+V` after copying something. For videos longer than 10 seconds a preview appears with a start slider — drag to keep the part you want.
 - Preview the original and the sticker side by side, check the size badge, then download the `.webp`.
 
 To actually use it in WhatsApp, import the downloaded file with a sticker-maker app (Sticker Maker, Sticker.ly, etc.). WhatsApp has no web API for adding a single sticker directly from a browser.
@@ -31,11 +31,12 @@ To actually use it in WhatsApp, import the downloaded file with a sticker-maker 
 ## What the converter does
 
 1. **GIF** — decodes every frame with `image`'s GIF decoder (handles disposal and partial frames), normalises frame delays, enforces WhatsApp's 8 ms minimum, trims to 10 seconds.
-2. **Images** (PNG/JPEG/WebP) — decoded and padded to a square; transparency is preserved.
-3. **Videos** — the browser samples frames at ~12 fps (`<video>` + canvas), capped at a 10-second window, and posts them to Rust as WebP images. Sampling happens during playback (up to 3× speed) because seeking can return stale frames; nothing is uploaded anywhere and no ffmpeg is needed. Longer videos show a trim slider: drag to choose which 10 seconds become the sticker.
-4. Every frame is scaled so the longest edge is 512 px and centered on a transparent 512×512 canvas, so landscape and portrait clips get transparent bars instead of being cropped.
-5. Animated stickers are encoded with libwebp through `webp-animation` (lossy, alpha preserved). Instead of walking a fixed quality ladder, the encoder starts at quality 60 and predicts the next quality from how far it overshot, so most stickers take one or two passes. If even low quality will not fit 500 KB, the frame rate is halved and retried.
-6. Single-frame results are encoded as lossy **static** WebP via libwebp's `WebPEncodeRGBA`, targeting the stricter 100 KB limit.
+2. **Images and still WebP** (PNG/JPEG/WebP) — decoded and padded to a square; transparency is preserved.
+3. **Animated WebP** — detected by walking the RIFF chunk table (VP8X animation flag / ANMF), decoded through `image`'s `AnimationDecoder` with the exact same delay handling and 10 s trim as GIFs. No extra crates are involved.
+4. **Videos** — the browser samples frames at ~12 fps (`<video>` + canvas), capped at a 10-second window, and posts them to Rust as WebP images. Sampling happens during playback (up to 3× speed) because seeking can return stale frames; nothing is uploaded anywhere and no ffmpeg is needed. Longer videos show a trim slider: drag to choose which 10 seconds become the sticker.
+5. Every frame is scaled so the longest edge is 512 px and centered on a transparent 512×512 canvas, so landscape and portrait clips get transparent bars instead of being cropped.
+6. Animated stickers are encoded with libwebp through `webp-animation` (lossy, alpha preserved). Instead of walking a fixed quality ladder, the encoder starts at quality 60 and predicts the next quality from how far it overshot, so most stickers take one or two passes. If even low quality will not fit 500 KB, the frame rate is halved and retried.
+7. Single-frame results are encoded as lossy **static** WebP via libwebp's `WebPEncodeRGBA`, targeting the stricter 100 KB limit.
 
 Long or busy videos are the hard case: WhatsApp's 500 KB animated limit is what dictates how much motion fits, so a full 10-second clip with lots of detail will end up at a lower frame rate and quality. Short clips (2–4 s) stay smooth at 12 fps.
 

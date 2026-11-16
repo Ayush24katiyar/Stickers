@@ -134,7 +134,7 @@ async function pickFile(file) {
 
   const objectUrl = URL.createObjectURL(file);
   els.convertFile.disabled = true;
-  setStatus("Reading the video…", "busy");
+  setStatus("Loading video…", "busy");
 
   try {
     const element = await openVideo(objectUrl);
@@ -149,7 +149,7 @@ async function pickFile(file) {
     setStatus(
       canTrim(pendingVideo)
         ? "Pick the 10 seconds to keep, then press Convert file."
-        : "Ready — frames will be sampled in your browser.",
+        : "Ready.",
     );
     els.convertFile.disabled = busy;
   } catch (error) {
@@ -276,7 +276,7 @@ async function convertFromUrl() {
   selectedUrl = url;
   selectedFile = null;
   resetResult();
-  setBusy(true, "Fetching and building your sticker…");
+  setBusy(true, "Building your sticker…");
 
   try {
     const response = await fetch("/api/convert-url", {
@@ -410,7 +410,7 @@ async function convertVideo(video, poster, startAt = 0) {
     els.beforeImg.src = await blobToDataUrl(frames[0]);
   }
 
-  setStatus("Turning the frames into a sticker…", "busy");
+  setStatus("Building the sticker…", "busy");
 
   const totalBytes = frames.reduce((sum, blob) => sum + blob.size, 0);
   if (totalBytes > 30 * 1024 * 1024) {
@@ -699,7 +699,7 @@ async function showResult(buffer, headers) {
 
   els.meta.innerHTML = chips.join("");
   els.result.classList.remove("is-hidden");
-  setStatus("Sticker is ready. Download it, then import it with a sticker maker app.");
+  setStatus("Sticker is ready.");
   els.result.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 

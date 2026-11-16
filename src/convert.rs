@@ -2,6 +2,7 @@ use std::io::Cursor;
 
 use anyhow::{anyhow, bail, Context, Result};
 use image::codecs::gif::GifDecoder;
+use image::codecs::webp::WebPDecoder;
 use image::imageops::FilterType;
 use image::{AnimationDecoder, RgbaImage};
 use webp_animation::{Encoder, EncoderOptions, EncodingConfig, EncodingType, LossyEncodingConfig};
@@ -35,20 +36,61 @@ pub fn convert(input: &[u8]) -> Result<Sticker> {
     if is_gif(input) {
         return convert_gif(input);
     }
+    if is_animated_webp(input) {
+        return convert_animated_webp(input);
+    }
     if is_still_image(input) {
         return convert_still(input);
     }
-    bail!("Unsupported file. Use a GIF, PNG, JPEG, WebP, or a short video.")
+    bail!("Unsupported file. Use a GIF, PNG, JPEG, animated WebP, or a short video.")
 }
 
 fn is_gif(input: &[u8]) -> bool {
     input.len() >= 6 && (&input[..6] == b"GIF87a" || &input[..6] == b"GIF89a")
 }
 
+/// Animated WebPs carry an ANIM chunk in the RIFF container (flagged in the
+/// VP8X header as well). Walk the chunk table instead of trusting the header.
+fn is_animated_webp(input: &[u8]) -> bool {
+    if input.len() < 30 || !input.starts_with(b"RIFF") || &input[8..12] != b"WEBP" {
+        return false;
+    }
+
+    let mut i = 12;
+    while i + 8 <= input.len() {
+        let id = &input[i..i + 4];
+        let size = u32::from_le_bytes(input[i + 4..i + 8].try_into().unwrap()) as usize;
+        if id == b"ANIM" || id == b"ANMF" {
+            return true;
+        }
+        i = i.saturating_add(8).saturating_add(size).saturating_add(size & 1);
+    }
+    false
+}
+
 fn is_still_image(input: &[u8]) -> bool {
     input.starts_with(&[0x89, b'P', b'N', b'G'])
         || input.starts_with(&[0xFF, 0xD8, 0xFF])
         || (input.len() > 12 && input.starts_with(b"RIFF") && &input[8..12] == b"WEBP")
+}
+
+/// Turn decoded animation frames into our padded, trimmed frame list.
+fn delayed_frames(image_frames: Vec<image::Frame>) -> Vec<Frame> {
+    image_frames
+        .into_iter()
+        .map(|frame| {
+            let (numer, denom) = frame.delay().numer_denom_ms();
+            let delay_ms = if denom == 0 {
+                100
+            } else {
+                (numer / denom).max(MIN_FRAME_MS)
+            };
+            Frame {
+                rgba: frame.into_buffer(),
+                duration_ms: delay_ms,
+            }
+        })
+        .collect()
 }
 
 /// Decode a GIF and turn it into an animated (or static) sticker.
@@ -67,19 +109,28 @@ pub fn convert_gif(input: &[u8]) -> Result<Sticker> {
         bail!("This GIF has no frames.");
     }
 
-    let mut frames: Vec<Frame> = Vec::with_capacity(gif_frames.len());
-    for frame in gif_frames {
-        let (numer, denom) = frame.delay().numer_denom_ms();
-        let delay_ms = if denom == 0 {
-            100
-        } else {
-            (numer / denom).max(MIN_FRAME_MS)
-        };
-        frames.push(Frame {
-            rgba: frame.into_buffer(),
-            duration_ms: delay_ms,
-        });
+    let frames = delayed_frames(gif_frames);
+
+    let original_duration: u32 = frames.iter().map(|f| f.duration_ms).sum();
+    let trimmed = original_duration > MAX_DURATION_MS;
+    assemble(frames, trimmed)
+}
+
+/// Decode an animated WebP and turn it into an animated sticker.
+pub fn convert_animated_webp(input: &[u8]) -> Result<Sticker> {
+    let decoder =
+        WebPDecoder::new(Cursor::new(input)).context("Could not decode this animated WebP.")?;
+
+    let webp_frames = decoder
+        .into_frames()
+        .collect_frames()
+        .context("Could not read the frames of this WebP.")?;
+
+    if webp_frames.is_empty() {
+        bail!("This WebP has no frames.");
     }
+
+    let frames = delayed_frames(webp_frames);
 
     let original_duration: u32 = frames.iter().map(|f| f.duration_ms).sum();
     let trimmed = original_duration > MAX_DURATION_MS;
@@ -392,6 +443,45 @@ mod tests {
         let (width, height, flags) = vp8x(&sticker.bytes);
         assert_eq!((width, height), (STICKER_SIZE, STICKER_SIZE));
         assert_eq!(flags & 0x02, 0x02, "animated bit should be set");
+    }
+
+    #[test]
+    fn converts_animated_webp_to_animated_sticker() {
+        let frames: Vec<Frame> = (0..5u8)
+            .map(|index| Frame {
+                rgba: RgbaImage::from_pixel(512, 512, Rgba([index * 50, 100, 200, 255])),
+                duration_ms: 90,
+            })
+            .collect();
+
+        // Round-trip through our own animated encoder to get a real animated WebP.
+        let webp = encode_animated(&frames, 80.0).unwrap();
+        assert!(is_animated_webp(&webp));
+
+        let sticker = convert(&webp).unwrap();
+        assert_eq!(sticker.kind, "animated");
+        assert_eq!(sticker.frames, 5);
+        assert!(sticker.bytes.len() <= MAX_BYTES_ANIMATED, "{} bytes", sticker.bytes.len());
+        let (width, height, flags) = vp8x(&sticker.bytes);
+        assert_eq!((width, height), (STICKER_SIZE, STICKER_SIZE));
+        assert_eq!(flags & 0x02, 0x02, "animated bit should be set");
+    }
+
+    #[test]
+    fn animated_webp_is_not_treated_as_still() {
+        let frames: Vec<Frame> = (0..3u8)
+            .map(|index| Frame {
+                rgba: RgbaImage::from_pixel(512, 512, Rgba([200, index * 80, 40, 255])),
+                duration_ms: 120,
+            })
+            .collect();
+
+        let webp = encode_animated(&frames, 80.0).unwrap();
+        let sticker = convert(&webp).unwrap();
+
+        // If the file were routed through the still-image path we would get one frame.
+        assert_eq!(sticker.frames, 3);
+        assert_eq!(sticker.kind, "animated");
     }
 
     #[test]

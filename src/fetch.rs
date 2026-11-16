@@ -30,6 +30,40 @@ pub fn client() -> Result<reqwest::Client> {
         .context("Could not build the HTTP client.")
 }
 
+/// A few extra attempts for flaky CDN nodes. Some YouTube preview URLs flip
+/// between 404 and 200 on the edge servers that answer the request — a short
+/// burst usually lands on a healthy node.
+async fn get_with_retry(
+    client: &reqwest::Client,
+    url: Url,
+    timeout: Option<Duration>,
+) -> Result<reqwest::Response> {
+    let attempt = |url: Url| {
+        let mut request = client.get(url);
+        if let Some(timeout) = timeout {
+            request = request.timeout(timeout);
+        }
+        request.send()
+    };
+
+    let mut last_response: Option<reqwest::Response> = None;
+
+    for round in 0..6 {
+        let response = attempt(url.clone()).await.context("Could not reach that link.")?;
+
+        if response.status().is_success() {
+            return Ok(response);
+        }
+
+        last_response = Some(response);
+        if round < 5 {
+            tokio::time::sleep(Duration::from_millis(350)).await;
+        }
+    }
+
+    Ok(last_response.expect("six attempts produced no response"))
+}
+
 /// Work out what a pasted link points at.
 pub async fn resolve(client: &reqwest::Client, raw_url: &str) -> Result<Media> {
     let url = validate(raw_url)?;
@@ -45,14 +79,15 @@ pub async fn resolve(client: &reqwest::Client, raw_url: &str) -> Result<Media> {
         }));
     }
 
-    let response = client
-        .get(url.clone())
-        .send()
+    let response = get_with_retry(client, url.clone(), None)
         .await
         .context("Could not reach that link. Check the URL and try again.")?;
 
     if !response.status().is_success() {
-        bail!("That link returned HTTP {}.", response.status().as_u16());
+        bail!(
+            "That link returned HTTP {}. If it is a YouTube preview URL it may have expired — save the file and drop it in the Upload tab.",
+            response.status().as_u16()
+        );
     }
 
     let content_type = response
@@ -82,10 +117,7 @@ pub async fn resolve(client: &reqwest::Client, raw_url: &str) -> Result<Media> {
 pub async fn download_video(client: &reqwest::Client, raw_url: &str) -> Result<(Vec<u8>, String)> {
     let url = validate(raw_url)?;
 
-    let response = client
-        .get(url)
-        .timeout(Duration::from_secs(120))
-        .send()
+    let response = get_with_retry(client, url, Some(Duration::from_secs(120)))
         .await
         .context("Could not reach that video.")?;
 
