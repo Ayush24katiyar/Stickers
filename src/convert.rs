@@ -306,62 +306,55 @@ fn encode_animated(frames: &[Frame], quality: f32) -> Result<Vec<u8>> {
     Ok(data.to_vec())
 }
 
-/// Encoding an animation is expensive (every attempt re-encodes every frame),
-/// so instead of walking a fixed quality ladder we predict the next quality
-/// from how far the last attempt overshot. Two passes is the usual cost.
-fn fit_animated(mut frames: Vec<Frame>, budget: usize) -> Result<(Vec<u8>, u8)> {
-    let mut best: Option<(Vec<u8>, u8)> = None;
-    let mut quality = 60.0f32;
-    let mut attempt = 0;
-
-    loop {
-        attempt += 1;
-        let bytes = encode_animated(&frames, quality)?;
-        let fits = bytes.len() <= budget;
-
+/// Walk a descending quality ladder at a fixed frame count. The first rung
+/// that fits is the highest usable quality, so we stop there. `best` tracks
+/// the smallest encode seen so a later frame reduction can fall back to it.
+fn try_quality_ladder(
+    frames: &[Frame],
+    budget: usize,
+    best: &mut Option<(Vec<u8>, u8)>,
+) -> Result<Option<(Vec<u8>, u8)>> {
+    // A long animation can't fit the budget at very high quality, so skip
+    // those rungs instead of paying for a full encode just to prove it. Short
+    // ones keep them to squeeze out the best quality available.
+    let rungs: &[u8] = if frames.len() >= 40 {
+        &[60, 50, 45, 40, 35, 30, 25, 20, 15, 10]
+    } else {
+        &[80, 70, 60, 52, 45, 40, 35, 30, 25, 20, 15, 10]
+    };
+    for &quality in rungs {
+        let bytes = encode_animated(frames, quality as f32)?;
         if best
             .as_ref()
             .map_or(true, |(current, _)| bytes.len() < current.len())
         {
-            best = Some((bytes.clone(), quality.round() as u8));
+            *best = Some((bytes.clone(), quality));
         }
-
-        if fits {
-            // Lots of headroom: spend it on one richer pass.
-            let roomy = (bytes.len() as f32) < budget as f32 * 0.62;
-            if roomy && quality < 78.0 && attempt < 3 {
-                quality = (quality + 20.0).min(85.0);
-                continue;
-            }
-            return Ok((bytes, quality.round() as u8));
+        if bytes.len() <= budget {
+            return Ok(Some((bytes, quality)));
         }
+    }
+    Ok(None)
+}
 
-        if attempt >= 5 {
-            break;
-        }
+/// Find the best quality that fits the byte budget while keeping every frame.
+/// Dropping frames is a last resort: only when even the lowest quality rung
+/// overflows do we halve the count and retry the ladder. This preserves far
+/// more of the source animation than bailing on quality after a few steps.
+fn fit_animated(mut frames: Vec<Frame>, budget: usize) -> Result<(Vec<u8>, u8)> {
+    let mut best: Option<(Vec<u8>, u8)> = None;
 
-        // Lossy WebP size falls roughly with quality^0.75. Only insist on a
-        // small drop: near the limit a 2-point step is usually enough.
-        let ratio = budget as f32 / bytes.len() as f32;
-        quality = (quality * ratio.powf(0.75)).clamp(10.0, quality - 2.0);
+    if let Some(result) = try_quality_ladder(&frames, budget, &mut best)? {
+        return Ok(result);
     }
 
-    // Still too heavy: trade frame rate for quality, keeping the best result.
+    // Even quality 10 is too heavy: trade frame rate for size, keeping the
+    // best (smallest) result from every round as a fallback.
     while frames.len() > 2 {
         let next_len = frames.len() / 2;
         frames = cap_frame_count(frames, next_len);
-
-        for quality in [45.0f32, 30.0] {
-            let bytes = encode_animated(&frames, quality)?;
-            if best
-                .as_ref()
-                .map_or(true, |(current, _)| bytes.len() < current.len())
-            {
-                best = Some((bytes.clone(), quality.round() as u8));
-            }
-            if bytes.len() <= budget {
-                return Ok((bytes, quality.round() as u8));
-            }
+        if let Some(result) = try_quality_ladder(&frames, budget, &mut best)? {
+            return Ok(result);
         }
     }
 

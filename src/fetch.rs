@@ -1,4 +1,7 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::net::IpAddr;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
@@ -64,6 +67,36 @@ async fn get_with_retry(
     Ok(last_response.expect("six attempts produced no response"))
 }
 
+/// Stable cache key: the parts of the URL that don't change when YouTube
+/// rotates the signed `sqp`/`rs` token on its preview images.
+fn cache_key(url: &Url) -> String {
+    let stable = format!("{}://{}{}", url.scheme(), url.host_str().unwrap_or(""), url.path());
+    let mut hasher = DefaultHasher::new();
+    stable.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
+fn cache_path(url: &Url) -> PathBuf {
+    std::env::temp_dir()
+        .join("sticker-link-cache")
+        .join(format!("{}.webp", cache_key(url)))
+}
+
+fn cache_get(url: &Url) -> Option<Vec<u8>> {
+    std::fs::read(cache_path(url)).ok()
+}
+
+fn cache_put(url: &Url, data: &[u8]) {
+    let path = cache_path(url);
+    if let Some(parent) = path.parent() {
+        if std::fs::create_dir_all(parent).is_err() {
+            return;
+        }
+    }
+    // Ignore failures — a cache miss just means the link must still be live.
+    let _ = std::fs::write(path, data);
+}
+
 /// Work out what a pasted link points at.
 pub async fn resolve(client: &reqwest::Client, raw_url: &str) -> Result<Media> {
     let url = validate(raw_url)?;
@@ -84,6 +117,12 @@ pub async fn resolve(client: &reqwest::Client, raw_url: &str) -> Result<Media> {
         .context("Could not reach that link. Check the URL and try again.")?;
 
     if !response.status().is_success() {
+        // YouTube signs its preview URLs with short-lived tokens. If the link
+        // rotated out from under us but we already fetched this exact asset,
+        // use the copy we kept — same bytes, fresh token or not.
+        if let Some(data) = cache_get(&url) {
+            return Ok(Media::Bytes(data));
+        }
         bail!(
             "That link returned HTTP {}. If it is a YouTube preview URL it may have expired — save the file and drop it in the Upload tab.",
             response.status().as_u16()
@@ -109,6 +148,7 @@ pub async fn resolve(client: &reqwest::Client, raw_url: &str) -> Result<Media> {
         bail!("That link is not a GIF, image, or video.");
     }
 
+    cache_put(&url, &data);
     Ok(Media::Bytes(data))
 }
 
