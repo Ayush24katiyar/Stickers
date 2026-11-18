@@ -17,6 +17,7 @@ const els = {
   afterImg: $("#after-img"),
   meta: $("#meta"),
   download: $("#download"),
+  downloadGif: $("#download-gif"),
   reset: $("#reset"),
   trim: $("#trim"),
   trimVideo: $("#trim-video"),
@@ -36,6 +37,8 @@ let selectedFile = null;
 let selectedUrl = "";
 let beforeUrl = null;
 let afterUrl = null;
+/// Raw WebP bytes of the last result, kept so the GIF export can reuse them.
+let afterBuffer = null;
 let busy = false;
 /// The clip a conversion will use, kept loaded so the preview and the sampler
 /// share one video element (and one download).
@@ -233,11 +236,39 @@ els.urlInput.addEventListener("keydown", (event) => {
 els.convertUrl.addEventListener("click", convertFromUrl);
 els.convertFile.addEventListener("click", convertFromFile);
 
+/** WhatsApp Web's own "Create sticker" keeps only frame 1; a GIF can be
+ * imported into an animated sticker-pack maker instead. */
+els.downloadGif.addEventListener("click", async () => {
+  if (!afterBuffer || busy) return;
+  setBusy(true, "Building GIF…");
+  try {
+    const response = await fetch("/api/as-gif", {
+      method: "POST",
+      headers: { "content-type": "application/octet-stream" },
+      body: afterBuffer,
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sticker.gif";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  } catch (error) {
+    setStatus(friendlyError(error), "error");
+  } finally {
+    setBusy(false);
+  }
+});
+
 function resetResult() {
   els.result.classList.add("is-hidden");
   sourceRange = null;
   if (afterUrl) URL.revokeObjectURL(afterUrl);
   afterUrl = null;
+  afterBuffer = null;
   els.afterImg.removeAttribute("src");
   els.beforeImg.removeAttribute("src");
   if (beforeUrl) URL.revokeObjectURL(beforeUrl);
@@ -673,6 +704,7 @@ function friendlyError(error) {
 async function showResult(buffer, headers) {
   const blob = new Blob([buffer], { type: "image/webp" });
   afterUrl = URL.createObjectURL(blob);
+  afterBuffer = buffer;
 
   els.afterImg.src = afterUrl;
   els.download.href = afterUrl;
@@ -682,6 +714,7 @@ async function showResult(buffer, headers) {
   const frames = Number(headers.get("x-sticker-frames") ?? 0);
   const duration = Number(headers.get("x-sticker-ms") ?? 0);
   const kind = headers.get("x-sticker-kind") ?? "animated";
+  els.downloadGif.classList.toggle("is-hidden", kind !== "animated");
   const trimmed = headers.get("x-sticker-trimmed") === "1";
   const quality = headers.get("x-sticker-quality");
   const fits = bytes <= (kind === "static" ? 100 : 500) * 1024;

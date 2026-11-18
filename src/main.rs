@@ -3,6 +3,7 @@ mod fetch;
 mod webp_static;
 
 use anyhow::Context as _;
+use axum::body::Bytes;
 use axum::extract::{DefaultBodyLimit, Multipart, Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -36,6 +37,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/convert", post(convert_upload))
         .route("/api/convert-url", post(convert_from_url))
         .route("/api/convert-frames", post(convert_frames_upload))
+        .route("/api/as-gif", post(as_gif))
         .route("/api/video", get(proxy_video))
         .layer(DefaultBodyLimit::max(MAX_UPLOAD_BYTES))
         .with_state(state);
@@ -216,6 +218,39 @@ async fn convert_bytes(bytes: Vec<u8>, source_name: &str) -> Response {
 
     let decoded = tokio::task::spawn_blocking(move || convert::convert(&bytes)).await;
     finish_conversion(decoded, source_name).await
+}
+
+/// Export an already-converted animated WebP as a GIF, for sticker-pack apps
+/// that only import GIF animations.
+async fn as_gif(body: Bytes) -> Response {
+    let result = tokio::task::spawn_blocking(move || convert::webp_to_gif(&body)).await;
+    let bytes = match result {
+        Ok(Ok(bytes)) => bytes,
+        Ok(Err(error)) => {
+            return (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                Json(json!({ "error": format!("{error:#}") })),
+            )
+                .into_response()
+        }
+        Err(error) => {
+            eprintln!("GIF export task panicked: {error}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "The GIF export crashed. Try another file." })),
+            )
+                .into_response();
+        }
+    };
+
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("image/gif"));
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_static("attachment; filename=\"sticker.gif\""),
+    );
+    (headers, bytes).into_response()
 }
 
 async fn finish_conversion(

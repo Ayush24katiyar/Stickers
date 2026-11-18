@@ -1,10 +1,10 @@
 use std::io::Cursor;
 
 use anyhow::{anyhow, bail, Context, Result};
-use image::codecs::gif::GifDecoder;
+use image::codecs::gif::{GifDecoder, GifEncoder, Repeat};
 use image::codecs::webp::WebPDecoder;
 use image::imageops::FilterType;
-use image::{AnimationDecoder, RgbaImage};
+use image::{AnimationDecoder, Delay, Frame as ImageFrame, RgbaImage};
 use webp_animation::{Encoder, EncoderOptions, EncodingConfig, EncodingType, LossyEncodingConfig};
 
 use crate::webp_static;
@@ -397,11 +397,62 @@ fn count_animated_frames(webp: &[u8]) -> usize {
     count.max(1)
 }
 
+/// Re-encode an animated WebP as a GIF. WhatsApp Web's "Create sticker" tool
+/// only keeps the first frame of any file you give it, but a lot of animated
+/// sticker-pack makers accept GIF (and some refuse animated WebP), so this
+/// gives people a working route into those apps. GIF is paletted, so frames
+/// are downscaled to keep the export a practical size to upload.
+pub fn webp_to_gif(bytes: &[u8]) -> Result<Vec<u8>> {
+    const SIDE: u32 = 256;
+
+    let decoder =
+        WebPDecoder::new(Cursor::new(bytes)).context("Could not read the sticker animation.")?;
+    let frames = decoder
+        .into_frames()
+        .collect_frames()
+        .context("Could not read the sticker frames.")?;
+    if frames.len() < 2 {
+        bail!("This sticker has no animation to export.");
+    }
+
+    let mut out = Vec::new();
+    {
+        let mut encoder = GifEncoder::new_with_speed(&mut out, 5);
+        encoder
+            .set_repeat(Repeat::Infinite)
+            .context("Could not start the GIF encoder.")?;
+
+        for frame in frames {
+            let (numerator, denominator) = frame.delay().numer_denom_ms();
+            let duration_ms = if denominator == 0 {
+                80
+            } else {
+                (numerator / denominator).max(20)
+            };
+            let scaled = image::imageops::resize(
+                &frame.into_buffer(),
+                SIDE,
+                SIDE,
+                FilterType::Lanczos3,
+            );
+            encoder
+                .encode_frame(ImageFrame::from_parts(
+                    scaled,
+                    0,
+                    0,
+                    Delay::from_numer_denom_ms(duration_ms, 1),
+                ))
+                .context("Could not encode a GIF frame.")?;
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::codecs::gif::GifEncoder;
-    use image::{Delay, Frame as GifFrame, Rgba};
+    use image::Frame as GifFrame;
+    use image::Rgba;
 
     fn sample_gif(frames: usize, width: u32, height: u32, delay_ms: u32) -> Vec<u8> {
         let mut bytes = Vec::new();
